@@ -12,7 +12,10 @@ Graph = namedtuple('Graph',
 
 
 def dedupe_tuples(tups):
-    return list(set([(a, b) if a < b else (b, a) for a, b in tups]))
+    try:
+        return list(set([(a, b) if a < b else (b, a) for a, b in tups]))
+    except ValueError:
+        raise Exception(tups)
 
 
 def get_src_dst_deps(src_deps, order=1):
