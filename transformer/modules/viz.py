@@ -24,6 +24,17 @@ def get_attention_map(g, src_nodes, dst_nodes, h):
     att = th.softmax(weight, -2)
     return att.numpy()
 
+def set_size(w,h, ax=None):
+    """ w, h: width, height in inches """
+    if not ax: ax=plt.gca()
+    l = ax.figure.subplotpars.left
+    r = ax.figure.subplotpars.right
+    t = ax.figure.subplotpars.top
+    b = ax.figure.subplotpars.bottom
+    figw = float(w)/(r-l)
+    figh = float(h)/(t-b)
+    ax.figure.set_size_inches(figw, figh)
+
 def draw_heatmap(array, input_seq, output_seq, dirname, name):
     dirname = os.path.join('log', dirname)
     if not os.path.exists(dirname):
