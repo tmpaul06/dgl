@@ -10,3 +10,4 @@ log/
 *.pyc
 *.lprof
 *.swp
+.idea/

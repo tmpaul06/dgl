@@ -117,8 +117,8 @@ class TranslationDataset(object):
         # XXX: partition then shuffle may not be equivalent to shuffle then
         # partition
         order = list(range(dev_rank, n, ndev))
-        # if mode == 'train':
-        #     random.shuffle(order)
+        if mode == 'train':
+            random.shuffle(order)
 
         src_buf, tgt_buf = [], []
         src_deps = []
