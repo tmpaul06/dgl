@@ -78,7 +78,7 @@ class Transformer(nn.Module):
         # Compute attention score
         if per_head:
             for i in range(0, len(per_head)):
-                g.apply_edges(src_dot_dst('k', 'q', 'score'), per_head[i])
+                g.apply_edges(src_dot_dst('k', 'q', 'score', i), per_head[i])
         else:
             g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
         g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
