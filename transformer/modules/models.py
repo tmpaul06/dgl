@@ -74,29 +74,36 @@ class Transformer(nn.Module):
         self.h, self.d_k = h, d_k
         self.att_weight_map = None
 
-    def propagate_attention(self, g, eids):
+    def propagate_attention(self, g, eids, per_head=False):
         # Compute attention score
-        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
+        if per_head:
+            for i in range(0, len(per_head)):
+                g.apply_edges(src_dot_dst('k', 'q', 'score'), per_head[i])
+        else:
+            g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
         g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
         # Send weighted values to target nodes
         g.send_and_recv(eids,
                         [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
                         [fn.sum('v', 'wv'), fn.sum('score', 'z')])
 
-    def update_graph(self, g, eids, pre_pairs, post_pairs):
+    def update_graph(self, g, eids, pre_pairs, post_pairs, per_head=False):
         "Update the node states and edge states of the graph."
 
         # Pre-compute queries and key-value pairs.
         for pre_func, nids in pre_pairs:
             g.apply_nodes(pre_func, nids)
-        self.propagate_attention(g, eids)
+
+        # When propagating attention we need to use the queries and keys corresponding to the hidden units
+        # and layers.
+        self.propagate_attention(g, eids, per_head=per_head)
         # Further calculation after attention mechanism
         for post_func, nids in post_pairs:
             g.apply_nodes(post_func, nids)
 
     def forward(self, graph):
         g = graph.g
-        nids, eids = graph.nids, graph.eids
+        nids, eids, layer_eids = graph.nids, graph.eids, graph.layer_eids
 
         # embed
         src_embed, src_pos = self.src_embed(graph.src[0]), self.pos_enc(graph.src[1])
@@ -104,11 +111,21 @@ class Transformer(nn.Module):
         g.nodes[nids['enc']].data['x'] = self.pos_enc.dropout(src_embed + src_pos)
         g.nodes[nids['dec']].data['x'] = self.pos_enc.dropout(tgt_embed + tgt_pos)
 
+        # First layer will be relative attention (past N positions)
+        # Second layer will be dependency arcs based attention
         for i in range(self.encoder.N):
             pre_func = self.encoder.pre_func(i, 'qkv')
             post_func = self.encoder.post_func(i)
+            # Use the nodes and edges at this layer. For a given layer, the nodes are still the same
+            # but the edges are different
             nodes, edges = nids['enc'], eids['ee']
-            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
+            # Here instead of eids['ee'] we will filter and pass only the nodes correspoding to dep.
+            # We will pass the edges for a given layer by itself
+
+            # Setting scores to zero will make it non-differentiable, instead we need a function that will cause
+            # the attended values to
+            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)], layer_eids['dep'] if i == 1 else False)
+            #self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')

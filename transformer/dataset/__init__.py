@@ -1,13 +1,17 @@
 from .graph import *
 from .fields import *
 from .utils import prepare_dataset
+import time
 import os
+import re
 import random
+
 
 class ClassificationDataset(object):
     "Dataset class for classification task."
     def __init__(self):
         raise NotImplementedError
+
 
 class TranslationDataset(object):
     '''
@@ -24,6 +28,8 @@ class TranslationDataset(object):
         self.tgt = {}
         with open(os.path.join(path, train + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['train'] = f.readlines()
+        with open(os.path.join(path, train + '_deps.' + exts[0]), 'r', encoding='utf-8') as f:
+            self.src['deps'] = f.readlines()
         with open(os.path.join(path, train + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['train'] = f.readlines()
         with open(os.path.join(path, valid + '.' + exts[0]), 'r', encoding='utf-8') as f:
@@ -63,7 +69,7 @@ class TranslationDataset(object):
         word_dict = {}
         for mode in ['train', 'valid', 'test']:
             for line in self.src[mode] + self.tgt[mode]:
-                for token in line.strip().split():
+                for token in line.strip():
                     if token not in word_dict:
                         word_dict[token] = 0
                     else:
@@ -111,30 +117,35 @@ class TranslationDataset(object):
         # XXX: partition then shuffle may not be equivalent to shuffle then
         # partition
         order = list(range(dev_rank, n, ndev))
-        if mode == 'train':
-            random.shuffle(order)
+        # if mode == 'train':
+        #     random.shuffle(order)
 
         src_buf, tgt_buf = [], []
+        src_deps = []
 
         for idx in order:
+
             src_sample = self.src_field(
                 src_data[idx].strip().split())
             tgt_sample = self.tgt_field(
                 tgt_data[idx].strip().split())
+            if not len(src_sample) or not len(tgt_sample):
+                continue
             src_buf.append(src_sample)
             tgt_buf.append(tgt_sample)
+            src_deps.append([tuple(map(int, re.findall(r'[0-9]+', el))) for el in self.src['deps'][idx].split(' ')])
             if len(src_buf) == batch_size:
                 if mode == 'test':
-                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
+                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps)
                 else:
-                    yield graph_pool(src_buf, tgt_buf, device=device)
+                    yield graph_pool(src_buf, tgt_buf, device=device, src_deps=src_deps)
                 src_buf, tgt_buf = [], []
 
         if len(src_buf) != 0:
             if mode == 'test':
-                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
+                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps)
             else:
-                yield graph_pool(src_buf, tgt_buf, device=device)
+                yield graph_pool(src_buf, tgt_buf, device=device, src_deps=src_deps)
 
     def get_sequence(self, batch):
         "return a list of sequence from a list of index arrays"
