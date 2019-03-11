@@ -23,7 +23,7 @@ def store_dependency_parses(in_filename, out_filename):
         batch_size = min(max(len(input_lines) // 100, 100), 500)
         with open(out_filename, 'w') as out_f:
             for i in tqdm(range(0, len(input_lines), batch_size)):
-                lines = input_lines[i:(i + batch_size + 1)]
+                lines = input_lines[i:(i + batch_size)]
                 out_lines = list()
                 for line in lines:
                     # Replace @ with ''. This is a cheap hack
@@ -36,7 +36,7 @@ def store_dependency_parses(in_filename, out_filename):
                     for tok in tokens:
                         line_deps.append(str((tok.i, tok.head.i)).replace(' ', ''))
                     out_lines.append(' '.join(line_deps))
-                out_f.write('\n'.join(out_lines))
+                out_f.write('\n'.join(out_lines) + '\n')
 
 
 def prepare_dataset(dataset_name):

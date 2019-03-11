@@ -74,27 +74,15 @@ class Transformer(nn.Module):
         self.h, self.d_k = h, d_k
         self.att_weight_map = None
 
-    def propagate_attention(self, g, eids, per_head=False):
-        # Compute attention score
-        if per_head:
-            for i in range(0, len(per_head)):
-                # This sends in the edges per head.
-                score_key = 'score{}'.format(i)
-                g.apply_edges(src_dot_dst('k', 'q', score_key, i), per_head[i])
-                g.apply_edges(scaled_exp(score_key, np.sqrt(self.d_k)), per_head[i])
-                # Send weighted values to target nodes
-                g.send_and_recv(per_head[i],
-                                [fn.src_mul_edge('v', score_key, 'v'), fn.copy_edge(score_key, score_key)],
-                                [fn.sum('v', 'wv'), fn.sum(score_key, 'z')])
-        else:
-            g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
-            g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
-            # Send weighted values to target nodes
-            g.send_and_recv(eids,
-                            [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
-                            [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+    def propagate_attention(self, g, eids):
+        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
+        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
+        # Send weighted values to target nodes
+        g.send_and_recv(eids,
+                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
+                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
 
-    def update_graph(self, g, eids, pre_pairs, post_pairs, per_head=False):
+    def update_graph(self, g, eids, pre_pairs, post_pairs):
         "Update the node states and edge states of the graph."
 
         # Pre-compute queries and key-value pairs.
@@ -103,7 +91,7 @@ class Transformer(nn.Module):
 
         # When propagating attention we need to use the queries and keys corresponding to the hidden units
         # and layers.
-        self.propagate_attention(g, eids, per_head=per_head)
+        self.propagate_attention(g, eids)
         # Further calculation after attention mechanism
         for post_func, nids in post_pairs:
             g.apply_nodes(post_func, nids)
@@ -125,13 +113,19 @@ class Transformer(nn.Module):
             post_func = self.encoder.post_func(i)
             # Use the nodes and edges at this layer. For a given layer, the nodes are still the same
             # but the edges are different
-            nodes, edges = nids['enc'], eids['ee']
+            if i == 1:
+                edges = layer_eids['dep'][0]
+            elif i == 2:
+                edges = layer_eids['dep'][1]
+            else:
+                edges = eids['ee']
+            nodes = nids['enc']
             # Here instead of eids['ee'] we will filter and pass only the nodes correspoding to dep.
             # We will pass the edges for a given layer by itself
 
             # Setting scores to zero will make it non-differentiable, instead we need a function that will cause
             # the attended values to
-            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)], layer_eids['dep'] if i == 1 else False)
+            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
             #self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
         for i in range(self.decoder.N):
