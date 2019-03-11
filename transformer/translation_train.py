@@ -87,8 +87,10 @@ def main(dev_id, args):
                         T.optim.Adam(model.parameters(), lr=1e-3,
                                      betas=(0.9, 0.98), eps=1e-9))
 
+    n_epoch = getattr(args, 'epoch', 10)
+    print('Number of epochs', n_epoch)
     # Train & evaluate
-    for epoch in range(getattr(args, 'epoch', 10)):
+    for epoch in range(n_epoch):
         start = time.time()
         train_iter = dataset(graph_pool, mode='train', batch_size=args.batch,
                              device=device, dev_rank=dev_rank, ndev=ndev)

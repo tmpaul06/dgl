@@ -29,24 +29,22 @@ def draw_heatmap(array, input_seq, output_seq, dirname, name):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    fig, axes = plt.subplots(2, 4)
+    fig, axes = plt.subplots(1, 2)
     cnt = 0
     for i in range(2):
-        for j in range(4):
-            axes[i, j].imshow(array[cnt].transpose(-1, -2))
-            axes[i, j].set_yticks(np.arange(len(input_seq)))
-            axes[i, j].set_xticks(np.arange(len(output_seq)))
-            axes[i, j].set_yticklabels(input_seq, fontsize=4)
-            axes[i, j].set_xticklabels(output_seq, fontsize=4)
-            axes[i, j].set_title('head_{}'.format(cnt), fontsize=10)
-            plt.setp(axes[i, j].get_xticklabels(), rotation=45, ha="right",
-                     rotation_mode="anchor")
-            cnt += 1
+        #for j in range(2):
+        axes[i].imshow(array[cnt].transpose(-1, -2))
+        axes[i].set_yticks(np.arange(len(input_seq)))
+        axes[i].set_xticks(np.arange(len(output_seq)))
+        axes[i].set_yticklabels(input_seq, fontsize=14)
+        axes[i].set_xticklabels(output_seq, fontsize=14)
+        axes[i].set_title('head_{}'.format(cnt), fontsize=20)
+        plt.setp(axes[i].get_xticklabels(), rotation=45, ha="right",
+                 rotation_mode="anchor")
+        set_size(18, 18, axes[i])
+        cnt += 1
 
     fig.suptitle(name, fontsize=12)
-    plt.tight_layout()
-    plt.savefig(os.path.join(dirname, '{}.pdf'.format(name)))
-    plt.close()
 
 def draw_atts(maps, src, tgt, dirname, prefix):
     '''
