@@ -139,10 +139,10 @@ class Transformer(nn.Module):
             self.update_graph(g, edges, [(pre_q, nodes), (pre_kv, nodes_e)], [(post_func, nodes)])
 
         # visualize attention
-        """
-            if self.att_weight_map is None:
-                self._register_att_map(g, graph.nid_arr['enc'][VIZ_IDX], graph.nid_arr['dec'][VIZ_IDX])
-        """
+
+        if self.att_weight_map is None:
+            self._register_att_map(g, graph.nid_arr['enc'][VIZ_IDX], graph.nid_arr['dec'][VIZ_IDX])
+
 
         return self.generator(g.ndata['x'][nids['dec']])
     def infer(self, graph, max_len, eos_id, k, alpha=1.0):
