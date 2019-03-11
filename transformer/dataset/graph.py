@@ -121,14 +121,6 @@ class GraphPool:
                 enc_ids.append(th.arange(n_nodes, n_nodes + n, dtype=th.long, device=device))
                 n_nodes += n
                 e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
-                n_edges += n_ee
-                tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
-                tgt_seq[0] = start_sym
-                tgt.append(tgt_seq)
-                tgt_pos.append(th.arange(max_len, dtype=th.long, device=device))
-
-                dec_ids.append(th.arange(n_nodes, n_nodes + max_len, dtype=th.long, device=device))
-                n_nodes += max_len
 
                 # Copy the ids of edges that correspond to a given node and its previous N nodes
                 # We are using arange here. This will not work. Instead we need to select edges that
@@ -139,6 +131,15 @@ class GraphPool:
                         for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
                             layer_eids['dep'][i].append(n_edges + src_node_id * n + dst_node_id)
                             layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
+
+                n_edges += n_ee
+                tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
+                tgt_seq[0] = start_sym
+                tgt.append(tgt_seq)
+                tgt_pos.append(th.arange(max_len, dtype=th.long, device=device))
+
+                dec_ids.append(th.arange(n_nodes, n_nodes + max_len, dtype=th.long, device=device))
+                n_nodes += max_len
 
                 e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
                 n_edges += n_ed
@@ -211,6 +212,9 @@ class GraphPool:
             n_nodes += n
             dec_ids.append(th.arange(n_nodes, n_nodes + m, dtype=th.long, device=device))
             n_nodes += m
+
+            e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
+
             # Copy the ids of edges that correspond to a given node and its previous N nodes
             # We are using arange here. This will not work. Instead we need to select edges that
             # correspond to previous positions. This information is present in graph pool
@@ -221,7 +225,6 @@ class GraphPool:
                         layer_eids['dep'][i].append(n_edges + src_node_id * n + dst_node_id)
                         layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
 
-            e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
             n_edges += n_ee
             e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
             n_edges += n_ed

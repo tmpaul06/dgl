@@ -88,7 +88,7 @@ def main(dev_id, args):
                                      betas=(0.9, 0.98), eps=1e-9))
 
     # Train & evaluate
-    for epoch in range(1):
+    for epoch in range(getattr(args, 'epoch', 10)):
         start = time.time()
         train_iter = dataset(graph_pool, mode='train', batch_size=args.batch,
                              device=device, dev_rank=dev_rank, ndev=ndev)
