@@ -50,17 +50,17 @@ def main(dev_id, args):
     else:
         device = torch.device('cuda:{}'.format(dev_id))
     # Set current device
-    th.cuda.set_device(device)
+    #th.cuda.set_device(device)
     # Prepare dataset
     dataset = get_dataset(args.dataset)
     V = dataset.vocab_size
     criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
-    dim_model = 512
+    dim_model = 128
     # Build graph pool
     graph_pool = GraphPool()
     # Create model
     model = make_model(V, V, N=args.N, dim_model=dim_model,
-                       universal=args.universal)
+                       universal=args.universal, h=2)
     # Sharing weights between Encoder & Decoder
     model.src_embed.lut.weight = model.tgt_embed.lut.weight
     model.generator.proj.weight = model.tgt_embed.lut.weight
@@ -88,7 +88,7 @@ def main(dev_id, args):
                                      betas=(0.9, 0.98), eps=1e-9))
 
     # Train & evaluate
-    for epoch in range(100):
+    for epoch in range(1):
         start = time.time()
         train_iter = dataset(graph_pool, mode='train', batch_size=args.batch,
                              device=device, dev_rank=dev_rank, ndev=ndev)
@@ -121,9 +121,9 @@ if __name__ == '__main__':
     np.random.seed(1111)
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
-    argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
+    argparser.add_argument('--N', default=2, type=int, help='enc/dec layers')
     argparser.add_argument('--dataset', default='multi30k', help='dataset')
-    argparser.add_argument('--batch', default=128, type=int, help='batch size')
+    argparser.add_argument('--batch', default=64, type=int, help='batch size')
     argparser.add_argument('--viz', action='store_true',
                            help='visualize attention')
     argparser.add_argument('--universal', action='store_true',
@@ -139,6 +139,7 @@ if __name__ == '__main__':
     print(args)
 
     devices = list(map(int, args.gpus.split(',')))
+
     if len(devices) == 1:
         args.ngpu = 0 if devices[0] < 0 else 1
         main(devices[0], args)

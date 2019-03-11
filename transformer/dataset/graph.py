@@ -6,7 +6,34 @@ import time
 from collections import *
 
 Graph = namedtuple('Graph',
-                   ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
+                   ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens', 'layer_eids'])
+
+# We need to create new graph pools for relative position attention (ngram style)
+
+
+def dedupe_tuples(tups):
+    return list(set([(a, b) if a < b else (b, a) for a, b in tups]))
+
+
+def get_src_dst_deps(src_deps, order=1):
+    if not isinstance(src_deps, list):
+        src_deps = [src_deps]
+    # If order is one, then we simply return src_deps
+    if order == 1:
+        return list(set(src_deps))
+    else:
+        new_deps = list()
+        for src, dst in src_deps:
+            # Go up one order. i.e make dst the src, and find its parent
+            for src_dup, dst_dup in src_deps:
+                if dst_dup == dst and src != src_dup:
+                    new_deps.append((src, src_dup))
+                elif src_dup == src and dst != dst_dup:
+                    new_deps.append((dst, dst_dup))
+                elif dst == src_dup and src != dst_dup:
+                    new_deps.append((src, dst_dup))
+        return list(set(get_src_dst_deps(new_deps, order=order - 1)).difference(set(src_deps)))
+
 
 class GraphPool:
     "Create a graph pool in advance to accelerate graph building phase in Transformer."
@@ -36,6 +63,7 @@ class GraphPool:
             # enc -> enc
             us = enc_nodes.unsqueeze(-1).repeat(1, src_length).view(-1)
             vs = enc_nodes.repeat(src_length)
+
             g_pool[i][j].add_edges(us, vs)
             num_edges['ee'][i][j] = len(us)
             # enc -> dec
@@ -54,7 +82,7 @@ class GraphPool:
         self.g_pool = g_pool
         self.num_edges = num_edges
 
-    def beam(self, src_buf, start_sym, max_len, k, device='cpu'):
+    def beam(self, src_buf, start_sym, max_len, k, device='cpu', src_deps=None):
         '''
         Return a batched graph for beam search during inference of Transformer.
         args:
@@ -64,6 +92,8 @@ class GraphPool:
             k: beam size
             device: 'cpu' or 'cuda:*' 
         '''
+        if src_deps is None:
+            src_deps = list()
         g_list = []
         src_lens = [len(_) for _ in src_buf]
         tgt_lens = [max_len] * len(src_buf)
@@ -79,9 +109,12 @@ class GraphPool:
         src, tgt = [], []
         src_pos, tgt_pos = [], []
         enc_ids, dec_ids = [], []
+        layer_eids = {
+            'dep': [[], []]
+        }
         e2e_eids, e2d_eids, d2d_eids = [], [], []
         n_nodes, n_edges, n_tokens = 0, 0, 0
-        for src_sample, n, n_ee, n_ed, n_dd in zip(src_buf, src_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
+        for src_sample, src_dep, n, n_ee, n_ed, n_dd in zip(src_buf, src_deps, src_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
             for _ in range(k):
                 src.append(th.tensor(src_sample, dtype=th.long, device=device))
                 src_pos.append(th.arange(n, dtype=th.long, device=device))
@@ -96,6 +129,17 @@ class GraphPool:
 
                 dec_ids.append(th.arange(n_nodes, n_nodes + max_len, dtype=th.long, device=device))
                 n_nodes += max_len
+
+                # Copy the ids of edges that correspond to a given node and its previous N nodes
+                # We are using arange here. This will not work. Instead we need to select edges that
+                # correspond to previous positions. This information is present in graph pool
+                # For each edge, we need to figure out source_node_id and target_node_id.
+                if src_dep:
+                    for i in range(0, 2):
+                        for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
+                            layer_eids['dep'][i].append(n_edges + src_node_id * n + dst_node_id)
+                            layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
+
                 e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
                 n_edges += n_ed
                 d2d_eids.append(th.arange(n_edges, n_edges + n_dd, dtype=th.long, device=device))
@@ -113,20 +157,35 @@ class GraphPool:
                      nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                      n_nodes=n_nodes,
                      n_edges=n_edges,
+                     layer_eids={
+                         'dep': [
+                             th.tensor(layer_eids['dep'][i]) for i in range(0, len(layer_eids['dep']))
+                         ]
+                     },
                      n_tokens=n_tokens)
 
-    def __call__(self, src_buf, tgt_buf, device='cpu'):
+    def __call__(self, src_buf, tgt_buf, device='cpu', src_deps=None):
         '''
         Return a batched graph for the training phase of Transformer.
         args:
             src_buf: a set of input sequence arrays.
             tgt_buf: a set of output sequence arrays.
             device: 'cpu' or 'cuda:*'
+            src_deps: list, optional
+                Dependency parses of the source in the form of src_node_id -> dst_node_id.
+                where src is the child and dst is the parent. i.e a child node attends on its
+                syntactic parent in a dependency parse
         '''
+
+        if src_deps is None:
+            src_deps = list()
         g_list = []
         src_lens = [len(_) for _ in src_buf]
         tgt_lens = [len(_) - 1 for _ in tgt_buf]
+
         num_edges = {'ee': [], 'ed': [], 'dd': []}
+
+        # We are running over source and target pairs here
         for src_len, tgt_len in zip(src_lens, tgt_lens):
             i, j = src_len - 1, tgt_len - 1
             g_list.append(self.g_pool[i][j])
@@ -138,8 +197,11 @@ class GraphPool:
         src_pos, tgt_pos = [], []
         enc_ids, dec_ids = [], []
         e2e_eids, d2d_eids, e2d_eids = [], [], []
+        layer_eids = {
+            'dep': [[], []]
+        }
         n_nodes, n_edges, n_tokens = 0, 0, 0
-        for src_sample, tgt_sample, n, m, n_ee, n_ed, n_dd in zip(src_buf, tgt_buf, src_lens, tgt_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
+        for src_sample, tgt_sample, src_dep, n, m, n_ee, n_ed, n_dd in zip(src_buf, tgt_buf, src_deps, src_lens, tgt_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
             src.append(th.tensor(src_sample, dtype=th.long, device=device))
             tgt.append(th.tensor(tgt_sample[:-1], dtype=th.long, device=device))
             tgt_y.append(th.tensor(tgt_sample[1:], dtype=th.long, device=device))
@@ -149,6 +211,16 @@ class GraphPool:
             n_nodes += n
             dec_ids.append(th.arange(n_nodes, n_nodes + m, dtype=th.long, device=device))
             n_nodes += m
+            # Copy the ids of edges that correspond to a given node and its previous N nodes
+            # We are using arange here. This will not work. Instead we need to select edges that
+            # correspond to previous positions. This information is present in graph pool
+            # For each edge, we need to figure out source_node_id and target_node_id.
+            if src_dep:
+                for i in range(0, 2):
+                    for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
+                        layer_eids['dep'][i].append(n_edges + src_node_id * n + dst_node_id)
+                        layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
+
             e2e_eids.append(th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device))
             n_edges += n_ee
             e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
@@ -169,5 +241,10 @@ class GraphPool:
                      eids = {'ee': th.cat(e2e_eids), 'ed': th.cat(e2d_eids), 'dd': th.cat(d2d_eids)},
                      nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                      n_nodes=n_nodes,
+                     layer_eids={
+                         'dep': [
+                             th.tensor(layer_eids['dep'][i]) for i in range(0, len(layer_eids['dep']))
+                         ]
+                     },
                      n_edges=n_edges,
                      n_tokens=n_tokens)

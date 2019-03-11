@@ -2,11 +2,42 @@ import numpy as np
 import torch as th
 import os
 from dgl.data.utils import *
+import spacy
+from tqdm import tqdm
+
+nlp = spacy.load('en')
 
 _urls = {
     'wmt': 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wmt14bpe_de_en.zip',
     'scripts': 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/transformer_scripts.zip',
 }
+
+
+def store_dependency_parses(in_filename, out_filename):
+    """Create dependency parses in advance so that training is fast"""
+    with open(in_filename, 'r') as f:
+        input_lines = f.readlines()
+
+        print('Preparing dependency tokens for {} sentences using {}'.format(len(input_lines), in_filename))
+        # Batch write
+        batch_size = min(max(len(input_lines) // 100, 100), 500)
+        with open(out_filename, 'w') as out_f:
+            for i in tqdm(range(0, len(input_lines), batch_size)):
+                lines = input_lines[i:(i + batch_size + 1)]
+                out_lines = list()
+                for line in lines:
+                    # Replace @ with ''. This is a cheap hack
+                    line = line.replace('@', '').strip()
+                    if not line:
+                        continue
+                    tokens = nlp(line)
+
+                    line_deps = list()
+                    for tok in tokens:
+                        line_deps.append(str((tok.i, tok.head.i)).replace(' ', ''))
+                    out_lines.append(' '.join(line_deps))
+                out_f.write('\n'.join(out_lines))
+
 
 def prepare_dataset(dataset_name):
     "download and generate datasets"
@@ -22,6 +53,9 @@ def prepare_dataset(dataset_name):
         return
     if dataset_name == 'multi30k':
         os.system('bash scripts/prepare-multi30k.sh')
+        # Pre-create dependency parses for train, valid and test
+        for fi in ['train', 'val', 'test2016']:
+            store_dependency_parses('data/multi30k/{}.en.atok'.format(fi), 'data/multi30k/{}_deps.en.atok'.format(fi))
     elif dataset_name == 'wmt14':
         download(_urls['wmt'], path='wmt14.zip')
         os.system('bash scripts/prepare-wmt14.sh')
