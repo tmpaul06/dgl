@@ -136,7 +136,7 @@ class GraphPool:
                             layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
                         max_layer_eid = max(layer_eids['dep'][i])
                         if max_layer_eid > (n_edges + n_ee):
-                            raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid.n_edges + n_ee))
+                            raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid, n_edges + n_ee))
 
                 n_edges += n_ee
                 tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
@@ -228,7 +228,7 @@ class GraphPool:
                         layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
                     max_layer_eid = max(layer_eids['dep'][i])
                     if max_layer_eid > (n_edges + n_ee):
-                        raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid. n_edges + n_ee))
+                        raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid, n_edges + n_ee))
 
             n_edges += n_ee
             e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
