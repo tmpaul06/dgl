@@ -113,20 +113,14 @@ class Transformer(nn.Module):
             post_func = self.encoder.post_func(i)
             # Use the nodes and edges at this layer. For a given layer, the nodes are still the same
             # but the edges are different
-            if i == 1:
+            if i == 0:
                 edges = layer_eids['dep'][0]
-            elif i == 2:
+            elif i == 1:
                 edges = layer_eids['dep'][1]
             else:
                 edges = eids['ee']
             nodes = nids['enc']
-            # Here instead of eids['ee'] we will filter and pass only the nodes correspoding to dep.
-            # We will pass the edges for a given layer by itself
-
-            # Setting scores to zero will make it non-differentiable, instead we need a function that will cause
-            # the attended values to
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-            #self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')
