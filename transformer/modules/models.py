@@ -113,9 +113,9 @@ class Transformer(nn.Module):
             post_func = self.encoder.post_func(i)
             # Use the nodes and edges at this layer. For a given layer, the nodes are still the same
             # but the edges are different
-            if i == 1:
+            if i == 0:
                 edges = layer_eids['dep'][0]
-            elif i == 2:
+            elif i == 1:
                 edges = layer_eids['dep'][1]
             else:
                 edges = eids['ee']

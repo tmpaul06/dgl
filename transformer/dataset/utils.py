@@ -12,12 +12,11 @@ _urls = {
     'scripts': 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/transformer_scripts.zip',
 }
 
-
 def store_dependency_parses(in_filename, out_filename):
     """Create dependency parses in advance so that training is fast"""
-    with open(in_filename, 'r') as f:
+    with open(in_filename, 'r+') as f:
         input_lines = f.readlines()
-
+        f.seek(0)
         print('Preparing dependency tokens for {} sentences using {}'.format(len(input_lines), in_filename))
         # Batch write
         batch_size = min(max(len(input_lines) // 100, 100), 500)
@@ -25,18 +24,20 @@ def store_dependency_parses(in_filename, out_filename):
             for i in tqdm(range(0, len(input_lines), batch_size)):
                 lines = input_lines[i:(i + batch_size)]
                 out_lines = list()
+                new_lines = list()
                 for line in lines:
                     # Replace @ with ''. This is a cheap hack
                     line = line.replace('@', '').strip()
                     if not line:
                         continue
                     tokens = nlp(line)
-
                     line_deps = list()
                     for tok in tokens:
                         line_deps.append(str((tok.i, tok.head.i)).replace(' ', ''))
                     out_lines.append(' '.join(line_deps))
+                    new_lines.append(' '.join([t.text if t.text != '-' else '@-@' for t in tokens]))
                 out_f.write('\n'.join(out_lines) + '\n')
+                f.write('\n'.join(new_lines) + '\n')
 
 
 def prepare_dataset(dataset_name):

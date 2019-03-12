@@ -69,7 +69,7 @@ class TranslationDataset(object):
         word_dict = {}
         for mode in ['train', 'valid', 'test']:
             for line in self.src[mode] + self.tgt[mode]:
-                for token in line.strip():
+                for token in line.strip().split():
                     if token not in word_dict:
                         word_dict[token] = 0
                     else:
@@ -138,16 +138,17 @@ class TranslationDataset(object):
                 src_deps.append([tuple(map(int, re.findall(r'[0-9]+', el))) for el in self.src['deps'][idx].split(' ')])
             if len(src_buf) == batch_size:
                 if mode == 'test':
-                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps)
+                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps, vocab=self.vocab)
                 else:
-                    yield graph_pool(src_buf, tgt_buf, device=device, src_deps=src_deps)
+                    yield graph_pool(src_buf, tgt_buf, device=device, src_deps=src_deps, vocab=self.vocab)
                 src_buf, tgt_buf = [], []
+                src_deps = []
 
         if len(src_buf) != 0:
             if mode == 'test':
-                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps)
+                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps, vocab=self.vocab)
             else:
-                yield graph_pool(src_buf, tgt_buf, device=device, src_deps=src_deps)
+                yield graph_pool(src_buf, tgt_buf, device=device, src_deps=src_deps, vocab=self.vocab)
 
     def get_sequence(self, batch):
         "return a list of sequence from a list of index arrays"

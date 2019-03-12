@@ -85,7 +85,7 @@ class GraphPool:
         self.g_pool = g_pool
         self.num_edges = num_edges
 
-    def beam(self, src_buf, start_sym, max_len, k, device='cpu', src_deps=None):
+    def beam(self, src_buf, start_sym, max_len, k, device='cpu', src_deps=None, vocab=None):
         '''
         Return a batched graph for beam search during inference of Transformer.
         args:
@@ -131,12 +131,14 @@ class GraphPool:
                 # For each edge, we need to figure out source_node_id and target_node_id.
                 if src_dep:
                     for i in range(0, 2):
+                        locals = list()
                         for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
-                            layer_eids['dep'][i].append(n_edges + src_node_id * n + dst_node_id)
-                            layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
-                        max_layer_eid = max(layer_eids['dep'][i])
+                            locals.append(n_edges + src_node_id * n + dst_node_id)
+                            locals.append(n_edges + dst_node_id * n + src_node_id)
+                        max_layer_eid = max(locals)
                         if max_layer_eid > (n_edges + n_ee):
                             raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid, n_edges + n_ee))
+                        layer_eids['dep'][i] += locals
 
                 n_edges += n_ee
                 tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
@@ -167,7 +169,7 @@ class GraphPool:
                      layer_eids=layer_eids,
                      n_tokens=n_tokens)
 
-    def __call__(self, src_buf, tgt_buf, device='cpu', src_deps=None):
+    def __call__(self, src_buf, tgt_buf, device='cpu', src_deps=None, vocab=None):
         '''
         Return a batched graph for the training phase of Transformer.
         args:
@@ -223,12 +225,14 @@ class GraphPool:
             # For each edge, we need to figure out source_node_id and target_node_id.
             if src_dep:
                 for i in range(0, 2):
+                    locals = list()
                     for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
-                        layer_eids['dep'][i].append(n_edges + src_node_id * n + dst_node_id)
-                        layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
-                    max_layer_eid = max(layer_eids['dep'][i])
+                        locals.append(n_edges + src_node_id * n + dst_node_id)
+                        locals.append(n_edges + dst_node_id * n + src_node_id)
+                    max_layer_eid = max(locals)
                     if max_layer_eid > (n_edges + n_ee):
                         raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid, n_edges + n_ee))
+                    layer_eids['dep'][i] += locals
 
             n_edges += n_ee
             e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
