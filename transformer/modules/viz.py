@@ -44,15 +44,15 @@ def draw_heatmap(array, input_seq, output_seq, dirname, name):
     cnt = 0
     for i in range(1):
         #for j in range(2):
-        axes[i].imshow(array[cnt].transpose(-1, -2))
-        axes[i].set_yticks(np.arange(len(input_seq)))
-        axes[i].set_xticks(np.arange(len(output_seq)))
-        axes[i].set_yticklabels(input_seq, fontsize=14)
-        axes[i].set_xticklabels(output_seq, fontsize=14)
-        axes[i].set_title('head_{}'.format(cnt), fontsize=20)
-        plt.setp(axes[i].get_xticklabels(), rotation=45, ha="right",
+        axes.imshow(array[cnt].transpose(-1, -2))
+        axes.set_yticks(np.arange(len(input_seq)))
+        axes.set_xticks(np.arange(len(output_seq)))
+        axes.set_yticklabels(input_seq, fontsize=14)
+        axes.set_xticklabels(output_seq, fontsize=14)
+        axes.set_title('head_{}'.format(cnt), fontsize=20)
+        plt.setp(axes.get_xticklabels(), rotation=45, ha="right",
                  rotation_mode="anchor")
-        set_size(18, 18, axes[i])
+        set_size(18, 18, axes)
         cnt += 1
 
     fig.suptitle(name, fontsize=12)
