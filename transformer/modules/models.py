@@ -113,9 +113,9 @@ class Transformer(nn.Module):
             post_func = self.encoder.post_func(i)
             # Use the nodes and edges at this layer. For a given layer, the nodes are still the same
             # but the edges are different
-            if i == 0:
+            if i == 0 and len(layer_eids['dep'][0]):
                 edges = layer_eids['dep'][0]
-            elif i == 1:
+            elif i == 1 and len(layer_eids['dep'][1]):
                 edges = layer_eids['dep'][1]
             else:
                 edges = eids['ee']
@@ -155,6 +155,7 @@ class Transformer(nn.Module):
         g = graph.g
         N, E = graph.n_nodes, graph.n_edges
         nids, eids = graph.nids, graph.eids
+        layer_eids = graph.layer_eids
 
         # embed & pos
         src_embed = self.src_embed(graph.src[0])
@@ -172,7 +173,13 @@ class Transformer(nn.Module):
         for i in range(self.encoder.N):
             pre_func = self.encoder.pre_func(i, 'qkv')
             post_func = self.encoder.post_func(i)
-            nodes, edges = nids['enc'], eids['ee']
+            nodes = nids['enc']
+            if i == 0 and len(layer_eids['dep'][0]):
+                edges = layer_eids['dep'][0]
+            elif i == 1 and len(layer_eids['dep'][1]):
+                edges = layer_eids['dep'][1]
+            else:
+                edges = eids['ee']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
         # decode
@@ -182,7 +189,7 @@ class Transformer(nn.Module):
             y = y.view(-1)
             tgt_embed = self.tgt_embed(y)
             g.ndata['x'][nids['dec']] = self.pos_enc.dropout(tgt_embed + tgt_pos)
-            edges_ed = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'] , eids['ed'])
+            edges_ed = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['ed'])
             edges_dd = g.filter_edges(lambda e: (e.dst['pos'] < step) & ~e.dst['mask'], eids['dd'])
             nodes_d = g.filter_nodes(lambda v: (v.data['pos'] < step) & ~v.data['mask'], nids['dec'])
             for i in range(self.decoder.N):

@@ -140,6 +140,8 @@ class TranslationDataset(object):
             tgt_buf.append(tgt_sample)
             if use_deps:
                 src_deps.append([tuple(map(int, re.findall(r'[0-9]+', el))) for el in self.src['{}-deps'.format(mode)][idx].split(' ')])
+            else:
+                src_deps.append(None)
             if len(src_buf) == batch_size:
                 if mode == 'test':
                     yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps, vocab=self.vocab)
