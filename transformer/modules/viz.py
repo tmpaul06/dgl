@@ -40,9 +40,9 @@ def draw_heatmap(array, input_seq, output_seq, dirname, name):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    fig, axes = plt.subplots(1, 2)
+    fig, axes = plt.subplots(1, 1)
     cnt = 0
-    for i in range(2):
+    for i in range(1):
         #for j in range(2):
         axes[i].imshow(array[cnt].transpose(-1, -2))
         axes[i].set_yticks(np.arange(len(input_seq)))
