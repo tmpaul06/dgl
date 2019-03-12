@@ -29,15 +29,19 @@ class TranslationDataset(object):
         with open(os.path.join(path, train + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['train'] = f.readlines()
         with open(os.path.join(path, train + '_deps.' + exts[0]), 'r', encoding='utf-8') as f:
-            self.src['deps'] = f.readlines()
+            self.src['train-deps'] = f.readlines()
         with open(os.path.join(path, train + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['train'] = f.readlines()
         with open(os.path.join(path, valid + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['valid'] = f.readlines()
+        with open(os.path.join(path, valid + '_deps.' + exts[0]), 'r', encoding='utf-8') as f:
+            self.src['valid-deps'] = f.readlines()
         with open(os.path.join(path, valid + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['valid'] = f.readlines()
         with open(os.path.join(path, test + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['test'] = f.readlines()
+        with open(os.path.join(path, test + '_deps.' + exts[0]), 'r', encoding='utf-8') as f:
+            self.src['test-deps'] = f.readlines()
         with open(os.path.join(path, test + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['test'] = f.readlines()
 
@@ -135,7 +139,7 @@ class TranslationDataset(object):
             src_buf.append(src_sample)
             tgt_buf.append(tgt_sample)
             if use_deps:
-                src_deps.append([tuple(map(int, re.findall(r'[0-9]+', el))) for el in self.src['deps'][idx].split(' ')])
+                src_deps.append([tuple(map(int, re.findall(r'[0-9]+', el))) for el in self.src['{}-deps'.format(mode)][idx].split(' ')])
             if len(src_buf) == batch_size:
                 if mode == 'test':
                     yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps, vocab=self.vocab)
