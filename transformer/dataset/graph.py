@@ -134,6 +134,9 @@ class GraphPool:
                         for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
                             layer_eids['dep'][i].append(n_edges + src_node_id * n + dst_node_id)
                             layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
+                        max_layer_eid = max(layer_eids['dep'][i])
+                        if max_layer_eid > (n_edges + n_ee):
+                            raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid.n_edges + n_ee))
 
                 n_edges += n_ee
                 tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
@@ -161,11 +164,7 @@ class GraphPool:
                      nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                      n_nodes=n_nodes,
                      n_edges=n_edges,
-                     layer_eids={
-                         'dep': [
-                             th.tensor(layer_eids['dep'][i]) for i in range(0, len(layer_eids['dep']))
-                         ]
-                     },
+                     layer_eids=layer_eids,
                      n_tokens=n_tokens)
 
     def __call__(self, src_buf, tgt_buf, device='cpu', src_deps=None):
@@ -227,6 +226,9 @@ class GraphPool:
                     for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
                         layer_eids['dep'][i].append(n_edges + src_node_id * n + dst_node_id)
                         layer_eids['dep'][i].append(n_edges + dst_node_id * n + src_node_id)
+                    max_layer_eid = max(layer_eids['dep'][i])
+                    if max_layer_eid > (n_edges + n_ee):
+                        raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid. n_edges + n_ee))
 
             n_edges += n_ee
             e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
@@ -247,10 +249,6 @@ class GraphPool:
                      eids = {'ee': th.cat(e2e_eids), 'ed': th.cat(e2d_eids), 'dd': th.cat(d2d_eids)},
                      nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                      n_nodes=n_nodes,
-                     layer_eids={
-                         'dep': [
-                             th.tensor(layer_eids['dep'][i]) for i in range(0, len(layer_eids['dep']))
-                         ]
-                     },
+                     layer_eids=layer_eids,
                      n_edges=n_edges,
                      n_tokens=n_tokens)
