@@ -97,7 +97,7 @@ class TranslationDataset(object):
         return self.vocab[self.EOS_TOKEN]
 
     def __call__(self, graph_pool, mode='train', batch_size=32, k=1,
-                 device='cpu', dev_rank=0, ndev=1):
+                 device='cpu', dev_rank=0, ndev=1, use_deps=True):
         '''
         Create a batched graph correspond to the mini-batch of the dataset.
         args:
@@ -108,6 +108,7 @@ class TranslationDataset(object):
             device: str or torch.device
             dev_rank: rank (id) of current device
             ndev: number of devices
+            use_deps: If true use dependency parses
         '''
         src_data, tgt_data = self.src[mode], self.tgt[mode]
         n = len(src_data)
@@ -133,7 +134,8 @@ class TranslationDataset(object):
                 continue
             src_buf.append(src_sample)
             tgt_buf.append(tgt_sample)
-            src_deps.append([tuple(map(int, re.findall(r'[0-9]+', el))) for el in self.src['deps'][idx].split(' ')])
+            if use_deps:
+                src_deps.append([tuple(map(int, re.findall(r'[0-9]+', el))) for el in self.src['deps'][idx].split(' ')])
             if len(src_buf) == batch_size:
                 if mode == 'test':
                     yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device, src_deps=src_deps)

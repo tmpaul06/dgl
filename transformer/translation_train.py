@@ -93,7 +93,7 @@ def main(dev_id, args):
     for epoch in range(n_epoch):
         start = time.time()
         train_iter = dataset(graph_pool, mode='train', batch_size=args.batch,
-                             device=device, dev_rank=dev_rank, ndev=ndev)
+                             device=device, dev_rank=dev_rank, ndev=ndev, use_deps=args.use_deps)
         model.train(True)
         run_epoch(epoch, train_iter, dev_rank, ndev, model,
                   loss_compute(opt=model_opt), is_train=True)
@@ -101,7 +101,7 @@ def main(dev_id, args):
             model.att_weight_map = None
             model.eval()
             valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch,
-                                 device=device, dev_rank=dev_rank, ndev=1)
+                                 device=device, dev_rank=dev_rank, ndev=1, use_deps=args.use_deps)
             run_epoch(epoch, valid_iter, dev_rank, 1, model,
                       loss_compute(opt=None), is_train=False)
             end = time.time()
@@ -123,11 +123,13 @@ if __name__ == '__main__':
     np.random.seed(1111)
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
-    argparser.add_argument('--N', default=2, type=int, help='enc/dec layers')
+    argparser.add_argument('--N', default=3, type=int, help='enc/dec layers')
     argparser.add_argument('--dataset', default='multi30k', help='dataset')
     argparser.add_argument('--batch', default=64, type=int, help='batch size')
     argparser.add_argument('--viz', action='store_true',
                            help='visualize attention')
+    argparser.add_argument('--use-deps',
+                           help='Use dependencies', default=True)
     argparser.add_argument('--universal', action='store_true',
                            help='use universal transformer')
     argparser.add_argument('--master-ip', type=str, default='127.0.0.1',
