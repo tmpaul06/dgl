@@ -64,6 +64,19 @@ class Decoder(nn.Module):
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
 
+def n_stack(nodes):
+    per_head = [1, 2]
+    return {
+        'z': th.stack([nodes.data['z_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
+        'wv': th.stack([nodes.data['wv_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
+    }
+
+def v_stack(nodes):
+    return {
+        # Initialize v_0 values for the nodes
+        'v_0': nodes.data['v'][:, 0, :],
+        'v_1': nodes.data['v'][:, 1, :]
+    }
 
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, d_k):
@@ -84,9 +97,11 @@ class Transformer(nn.Module):
                             [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
                             [fn.sum('v', 'wv'), fn.sum('score', 'z')])
         else:
-            all_eids = []
+            # Initialize values
+            g.apply_nodes(
+                v_stack
+            )
             for head in range(0, len(per_head)):
-                all_eids += per_head[head]
                 score_key = 'score_{}'.format(head)
                 value_key = 'v_{}'.format(head)
                 z_key = 'z_{}'.format(head)
@@ -95,17 +110,12 @@ class Transformer(nn.Module):
                 g.apply_edges(scaled_exp(score_key, np.sqrt(self.d_k)), per_head[head])
                 # Send weighted values to target nodes
                 g.send_and_recv(per_head[head],
-                                [fn.src_mul_edge('v', score_key, value_key), fn.copy_edge(score_key, score_key)],
+                                [fn.src_mul_edge(value_key, score_key, value_key), fn.copy_edge(score_key, score_key)],
                                 [fn.sum(value_key, wv_key), fn.sum(score_key, z_key)])
-
 
             # After all heads are done we will now stack the z values
             g.apply_nodes(
-                lambda nodes: {
-                    'z': th.stack([nodes.data['z_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
-                    'v': th.stack([nodes.data['v_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
-                    'wv': th.stack([nodes.data['wv_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
-                }
+                n_stack
             )
 
     def update_graph(self, g, eids, pre_pairs, post_pairs, per_head=None):
