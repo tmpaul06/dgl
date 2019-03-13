@@ -10,15 +10,15 @@ def src_dot_dst(src_field, dst_field, out_field, head_index=None):
 
         a = edges.src[src_field]
         b = edges.dst[dst_field]
-        c = (a * b)
-        d = c.sum(-1, keepdim=True)
-        if not head_index:
+        if head_index is None:
+            c = (a * b)
+            d = c.sum(-1, keepdim=True)
             return {out_field: d}
         else:
             # Per head, for each edge we will have a score. Instead we will now have scores for certain
             # edges for a given edge. Other heads for same edges may or may not update
             return {
-                out_field: (edges.src[src_field][:, head_index, :] * edges.dst[dst_field][:, head_index, :]).sum(-1, True)
+                out_field: (a[:, head_index, :] * b[:, head_index, :]).sum(-1, True)
             }
     return func
 

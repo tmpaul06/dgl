@@ -60,7 +60,7 @@ def main(dev_id, args):
     graph_pool = GraphPool()
     # Create model
     model = make_model(V, V, N=args.N, dim_model=dim_model,
-                       universal=args.universal, h=1)
+                       universal=args.universal, h=2)
     # Sharing weights between Encoder & Decoder
     model.src_embed.lut.weight = model.tgt_embed.lut.weight
     model.generator.proj.weight = model.tgt_embed.lut.weight
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     np.random.seed(1111)
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
-    argparser.add_argument('--N', default=3, type=int, help='enc/dec layers')
+    argparser.add_argument('--N', default=2, type=int, help='enc/dec layers')
     argparser.add_argument('--dataset', default='multi30k', help='dataset')
     argparser.add_argument('--batch', default=64, type=int, help='batch size')
     argparser.add_argument('--viz', action='store_true',

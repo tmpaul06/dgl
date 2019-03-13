@@ -64,6 +64,7 @@ class Decoder(nn.Module):
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
 
+
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, d_k):
         super(Transformer, self).__init__()
@@ -74,15 +75,40 @@ class Transformer(nn.Module):
         self.h, self.d_k = h, d_k
         self.att_weight_map = None
 
-    def propagate_attention(self, g, eids):
-        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
-        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
-        # Send weighted values to target nodes
-        g.send_and_recv(eids,
-                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
-                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+    def propagate_attention(self, g, eids, per_head):
+        if not per_head:
+            g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
+            g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
+            # Send weighted values to target nodes
+            g.send_and_recv(eids,
+                            [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
+                            [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+        else:
+            all_eids = []
+            for head in range(0, len(per_head)):
+                all_eids += per_head[head]
+                score_key = 'score_{}'.format(head)
+                value_key = 'v_{}'.format(head)
+                z_key = 'z_{}'.format(head)
+                wv_key = 'wv_{}'.format(head)
+                g.apply_edges(src_dot_dst('k', 'q', score_key, head), per_head[head])
+                g.apply_edges(scaled_exp(score_key, np.sqrt(self.d_k)), per_head[head])
+                # Send weighted values to target nodes
+                g.send_and_recv(per_head[head],
+                                [fn.src_mul_edge('v', score_key, value_key), fn.copy_edge(score_key, score_key)],
+                                [fn.sum(value_key, wv_key), fn.sum(score_key, z_key)])
 
-    def update_graph(self, g, eids, pre_pairs, post_pairs):
+
+            # After all heads are done we will now stack the z values
+            g.apply_nodes(
+                lambda nodes: {
+                    'z': th.stack([nodes.data['z_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
+                    'v': th.stack([nodes.data['v_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
+                    'wv': th.stack([nodes.data['wv_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
+                }
+            )
+
+    def update_graph(self, g, eids, pre_pairs, post_pairs, per_head=None):
         "Update the node states and edge states of the graph."
 
         # Pre-compute queries and key-value pairs.
@@ -91,7 +117,7 @@ class Transformer(nn.Module):
 
         # When propagating attention we need to use the queries and keys corresponding to the hidden units
         # and layers.
-        self.propagate_attention(g, eids)
+        self.propagate_attention(g, eids, per_head=per_head)
         # Further calculation after attention mechanism
         for post_func, nids in post_pairs:
             g.apply_nodes(post_func, nids)
@@ -113,14 +139,14 @@ class Transformer(nn.Module):
             post_func = self.encoder.post_func(i)
             # Use the nodes and edges at this layer. For a given layer, the nodes are still the same
             # but the edges are different
-            if i == 0 and len(layer_eids['dep'][0]):
-                edges = layer_eids['dep'][0]
-            elif i == 1 and len(layer_eids['dep'][1]):
-                edges = layer_eids['dep'][1]
-            else:
-                edges = eids['ee']
+            # if i == 0 and len(layer_eids['dep'][0]):
+            #     edges = layer_eids['dep'][0]
+            # elif i == 1 and len(layer_eids['dep'][1]):
+            #     edges = layer_eids['dep'][1]
+            # else:
+            edges = eids['ee']
             nodes = nids['enc']
-            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
+            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)], per_head=layer_eids['dep'] if i == 1 else None)
 
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')
