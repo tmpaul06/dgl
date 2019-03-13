@@ -110,7 +110,7 @@ def main(dev_id, args):
             # Visualize attention
             args_filter = ['batch', 'gpus', 'viz', 'master_ip', 'master_port', 'grad_accum', 'ngpu']
             exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
-            if args.viz:
+            if args.viz and epoch == (n_epoch - 1):
                 src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')
                 tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
                 draw_atts(model.att_weight_map, src_seq, tgt_seq, exp_setting, 'epoch_{}'.format(epoch))
