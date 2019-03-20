@@ -4,6 +4,7 @@ import numpy as np
 import itertools
 import time
 from collections import *
+import itertools
 from .layers import PositionalContextGraphLayer, DependencyContextGraphLayer
 
 Graph = namedtuple('Graph',
@@ -59,7 +60,7 @@ class GraphPool:
         self.g_pool = g_pool
         self.num_edges = num_edges
 
-    def beam(self, src_buf, start_sym, max_len, k, device='cpu', src_deps=None, vocab=None):
+    def beam(self, src_buf, start_sym, max_len, k, n_layers, n_heads, device='cpu', src_deps=None, vocab=None):
         '''
         Return a batched graph for beam search during inference of Transformer.
         args:
@@ -67,6 +68,8 @@ class GraphPool:
             start_sym: the index of start-of-sequence symbol
             max_len: maximum length for decoding
             k: beam size
+            n_layers: the number of layers
+            n_heads: the number of heads
             device: 'cpu' or 'cuda:*' 
         '''
         if src_deps is None:
@@ -86,7 +89,11 @@ class GraphPool:
         src, tgt = [], []
         src_pos, tgt_pos = [], []
         enc_ids, dec_ids = [], []
-        layer_eids = []
+        layer_eids = [
+            [
+                [] for _ in range(0, n_heads)
+            ] for _ in range(0, n_layers)
+        ]
         e2e_eids, e2d_eids, d2d_eids = [], [], []
         n_nodes, n_edges, n_tokens = 0, 0, 0
         for src_sample, src_dep, n, n_ee, n_ed, n_dd in zip(src_buf, src_deps, src_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
@@ -102,7 +109,9 @@ class GraphPool:
                 # correspond to previous positions. This information is present in graph pool
                 # For each edge, we need to figure out source_node_id and target_node_id.
 
-                layer_eids = self.get_edges_per_layer(2, src_dep, n_edges, n_ee, n)
+                custom_edges = self.get_edges_per_layer(n_heads, src_dep, n_edges, n_ee, n)
+                for ii, jj in itertools.product(range(n_layers), range(n_heads)):
+                    layer_eids[ii][jj] += (custom_edges[ii][jj])
 
                 n_edges += n_ee
                 tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
@@ -133,7 +142,7 @@ class GraphPool:
                      layer_eids=layer_eids,
                      n_tokens=n_tokens)
 
-    def get_edges_per_layer(self, num_heads, src_dep, n_edges, n_ee, n):
+    def get_edges_per_layer(self, num_layers, num_heads, src_dep, n_edges, n_ee, n):
         """Return edges for each head in a given layer"""
         edges_per_layer = list()
 
@@ -151,14 +160,24 @@ class GraphPool:
             max_edges=n_ee,
             src_dep=src_dep
         ))
+
+        if num_layers > 2:
+            # Add None so that regular edges are used
+            for i in range(2, num_layers):
+                edges_per_layer.append(
+                    [[None] for _ in range(num_heads)]
+                )
+
         return edges_per_layer
 
-    def __call__(self, src_buf, tgt_buf, device='cpu', src_deps=None, vocab=None):
+    def __call__(self, src_buf, tgt_buf, n_layers, n_heads, device='cpu', src_deps=None, vocab=None):
         '''
         Return a batched graph for the training phase of Transformer.
         args:
             src_buf: a set of input sequence arrays.
             tgt_buf: a set of output sequence arrays.
+            n_layers: the number of layers
+            n_heads: the number of heads
             device: 'cpu' or 'cuda:*'
             src_deps: list, optional
                 Dependency parses of the source in the form of src_node_id -> dst_node_id.
@@ -186,7 +205,12 @@ class GraphPool:
         src_pos, tgt_pos = [], []
         enc_ids, dec_ids = [], []
         e2e_eids, d2d_eids, e2d_eids = [], [], []
-        layer_eids = []
+        # For each layer, we have num_heads number of eids
+        layer_eids = [
+            [
+                [] for _ in range(0, n_heads)
+            ] for _ in range(0, n_layers)
+        ]
         n_nodes, n_edges, n_tokens = 0, 0, 0
         for src_sample, tgt_sample, src_dep, n, m, n_ee, n_ed, n_dd in zip(src_buf, tgt_buf, src_deps, src_lens, tgt_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
             src.append(th.tensor(src_sample, dtype=th.long, device=device))
@@ -205,7 +229,9 @@ class GraphPool:
             # We are using arange here. This will not work. Instead we need to select edges that
             # correspond to previous positions. This information is present in graph pool
             # For each edge, we need to figure out source_node_id and target_node_id.
-            layer_eids = self.get_edges_per_layer(2, src_dep, n_edges, n_ee, n)
+            custom_edges = self.get_edges_per_layer(n_layers, n_heads, src_dep, n_edges, n_ee, n)
+            for ii, jj in itertools.product(range(n_layers), range(n_heads)):
+                layer_eids[ii][jj] += (custom_edges[ii][jj])
 
             n_edges += n_ee
             e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
@@ -226,6 +252,7 @@ class GraphPool:
                      eids = {'ee': th.cat(e2e_eids), 'ed': th.cat(e2d_eids), 'dd': th.cat(d2d_eids)},
                      nid_arr = {'enc': enc_ids, 'dec': dec_ids},
                      n_nodes=n_nodes,
+                     # Concatenate
                      layer_eids=layer_eids,
                      n_edges=n_edges,
                      n_tokens=n_tokens)

@@ -89,7 +89,7 @@ class Transformer(nn.Module):
         self.att_weight_map = None
 
     def propagate_attention(self, g, eids, per_head):
-        if not per_head:
+        if not per_head or (per_head and all([all([a is None for a in p_h]) for p_h in per_head])):
             g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
             g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
             # Send weighted values to target nodes
@@ -99,7 +99,10 @@ class Transformer(nn.Module):
         else:
             # Initialize values
             g.apply_nodes(
-                v_stack
+                lambda nodes: {
+                    # Initialize v_i values for the nodes
+                    'v_{}'.format(i): nodes.data['v'][:, 0, :] for i in range(len(per_head))
+                }
             )
             for head in range(0, len(per_head)):
                 score_key = 'score_{}'.format(head)
@@ -115,7 +118,10 @@ class Transformer(nn.Module):
 
             # After all heads are done we will now stack the z values
             g.apply_nodes(
-                n_stack
+                lambda nodes: {
+                    'z': th.stack([nodes.data['z_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
+                    'wv': th.stack([nodes.data['wv_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
+                }
             )
 
     def update_graph(self, g, eids, pre_pairs, post_pairs, per_head=None):
@@ -156,7 +162,7 @@ class Transformer(nn.Module):
             # else:
             edges = eids['ee']
             nodes = nids['enc']
-            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)], per_head=layer_eids[i - 1] if i > 0 else [edges, edges])
+            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)], per_head=layer_eids[i])
 
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')
@@ -212,7 +218,7 @@ class Transformer(nn.Module):
             nodes = nids['enc']
             edges = eids['ee']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)],
-                              per_head=layer_eids[i - 1] if i > 0 else [edges, edges])
+                              per_head=layer_eids[i])
 
         # decode
         log_prob = None
