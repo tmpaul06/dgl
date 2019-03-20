@@ -156,7 +156,8 @@ class Transformer(nn.Module):
             # else:
             edges = eids['ee']
             nodes = nids['enc']
-            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)], per_head=layer_eids['dep'] if i == 1 else [eids['ee'], eids['ee']])
+            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)],
+                              per_head=[eids['ee'], layer_eids['dep'][0]] if i == 1 else [eids['ee'], layer_eids['dep'][1]])
 
         for i in range(self.decoder.N):
             pre_func = self.decoder.pre_func(i, 'qkv')
