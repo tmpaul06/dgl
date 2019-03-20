@@ -87,7 +87,7 @@ class Transformer(nn.Module):
                 ret_dict = {}
                 for i in range(0, len(per_head)):
                     ret_dict['v_{}'.format(i)] = nodes.data['v'][:, i, :]
-                    ret_dict['z_{}'.format(i)] = th.ones(nodes.data['v'].shape[0], 1)
+                    ret_dict['z_{}'.format(i)] = th.ones(nodes.data['v'].shape[0], 1, dtype=th.float64, device=th.device('cuda:0'))
                 return ret_dict
             # Initialize values
             g.apply_nodes(
