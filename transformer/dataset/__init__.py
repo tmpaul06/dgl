@@ -24,26 +24,27 @@ class TranslationDataset(object):
     MAX_LENGTH = 50
     def __init__(self, path, exts, train='train', valid='valid', test='test', vocab='vocab.txt', replace_oov=None):
         vocab_path = os.path.join(path, vocab)
+        max_len = None
         self.src = {}
         self.tgt = {}
         with open(os.path.join(path, train + '.' + exts[0]), 'r', encoding='utf-8') as f:
-            self.src['train'] = f.readlines()
+            self.src['train'] = f.readlines()[:max_len]
         with open(os.path.join(path, train + '_deps.' + exts[0]), 'r', encoding='utf-8') as f:
-            self.src['train-deps'] = f.readlines()
+            self.src['train-deps'] = f.readlines()[:max_len]
         with open(os.path.join(path, train + '.' + exts[1]), 'r', encoding='utf-8') as f:
-            self.tgt['train'] = f.readlines()
+            self.tgt['train'] = f.readlines()[:max_len]
         with open(os.path.join(path, valid + '.' + exts[0]), 'r', encoding='utf-8') as f:
-            self.src['valid'] = f.readlines()
+            self.src['valid'] = f.readlines()[:max_len]
         with open(os.path.join(path, valid + '_deps.' + exts[0]), 'r', encoding='utf-8') as f:
-            self.src['valid-deps'] = f.readlines()
+            self.src['valid-deps'] = f.readlines()[:max_len]
         with open(os.path.join(path, valid + '.' + exts[1]), 'r', encoding='utf-8') as f:
-            self.tgt['valid'] = f.readlines()
+            self.tgt['valid'] = f.readlines()[:max_len]
         with open(os.path.join(path, test + '.' + exts[0]), 'r', encoding='utf-8') as f:
-            self.src['test'] = f.readlines()
+            self.src['test'] = f.readlines()[:max_len]
         with open(os.path.join(path, test + '_deps.' + exts[0]), 'r', encoding='utf-8') as f:
-            self.src['test-deps'] = f.readlines()
+            self.src['test-deps'] = f.readlines()[:max_len]
         with open(os.path.join(path, test + '.' + exts[1]), 'r', encoding='utf-8') as f:
-            self.tgt['test'] = f.readlines()
+            self.tgt['test'] = f.readlines()[:max_len]
 
         if not os.path.exists(vocab_path):
             self._make_vocab(vocab_path)
