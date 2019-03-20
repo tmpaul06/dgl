@@ -131,7 +131,7 @@ class Transformer(nn.Module):
 
             # Setting scores to zero will make it non-differentiable, instead we need a function that will cause
             # the attended values to
-            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)], layer_eids['dep'] if i == 1 else False)
+            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
             #self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
         for i in range(self.decoder.N):
