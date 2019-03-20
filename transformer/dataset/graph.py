@@ -4,38 +4,12 @@ import numpy as np
 import itertools
 import time
 from collections import *
+from .layers import PositionalContextGraphLayer, DependencyContextGraphLayer
 
 Graph = namedtuple('Graph',
                    ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens', 'layer_eids'])
 
 # We need to create new graph pools for relative position attention (ngram style)
-
-
-def dedupe_tuples(tups):
-    try:
-        return list(set([(a, b) if a < b else (b, a) for a, b in tups]))
-    except ValueError:
-        raise Exception(tups)
-
-
-def get_src_dst_deps(src_deps, order=1):
-    if not isinstance(src_deps, list):
-        src_deps = [src_deps]
-    # If order is one, then we simply return src_deps
-    if order == 1:
-        return list(set(src_deps))
-    else:
-        new_deps = list()
-        for src, dst in src_deps:
-            # Go up one order. i.e make dst the src, and find its parent
-            for src_dup, dst_dup in src_deps:
-                if dst_dup == dst and src != src_dup:
-                    new_deps.append((src, src_dup))
-                elif src_dup == src and dst != dst_dup:
-                    new_deps.append((dst, dst_dup))
-                elif dst == src_dup and src != dst_dup:
-                    new_deps.append((src, dst_dup))
-        return list(set(get_src_dst_deps(new_deps, order=order - 1)).difference(set(src_deps)))
 
 
 class GraphPool:
@@ -112,9 +86,7 @@ class GraphPool:
         src, tgt = [], []
         src_pos, tgt_pos = [], []
         enc_ids, dec_ids = [], []
-        layer_eids = {
-            'dep': [[], []]
-        }
+        layer_eids = []
         e2e_eids, e2d_eids, d2d_eids = [], [], []
         n_nodes, n_edges, n_tokens = 0, 0, 0
         for src_sample, src_dep, n, n_ee, n_ed, n_dd in zip(src_buf, src_deps, src_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
@@ -129,16 +101,8 @@ class GraphPool:
                 # We are using arange here. This will not work. Instead we need to select edges that
                 # correspond to previous positions. This information is present in graph pool
                 # For each edge, we need to figure out source_node_id and target_node_id.
-                if src_dep:
-                    for i in range(0, 2):
-                        locals = list()
-                        for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
-                            locals.append(n_edges + src_node_id * n + dst_node_id)
-                            locals.append(n_edges + dst_node_id * n + src_node_id)
-                        max_layer_eid = max(locals)
-                        if max_layer_eid > (n_edges + n_ee):
-                            raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid, n_edges + n_ee))
-                        layer_eids['dep'][i] += locals
+
+                layer_eids = self.get_edges_per_layer(2, src_dep, n_edges, n_ee, n)
 
                 n_edges += n_ee
                 tgt_seq = th.zeros(max_len, dtype=th.long, device=device)
@@ -168,6 +132,26 @@ class GraphPool:
                      n_edges=n_edges,
                      layer_eids=layer_eids,
                      n_tokens=n_tokens)
+
+    def get_edges_per_layer(self, num_heads, src_dep, n_edges, n_ee, n):
+        """Return edges for each head in a given layer"""
+        edges_per_layer = list()
+
+        # layer 0: Positional
+        edges_per_layer.append(PositionalContextGraphLayer(num_heads).get_edges(
+            n,
+            edge_id_offset=n_edges,
+            max_edges=n_ee
+        ))
+
+        # layer 1: Dependency
+        edges_per_layer.append(DependencyContextGraphLayer(num_heads).get_edges(
+            n,
+            edge_id_offset=n_edges,
+            max_edges=n_ee,
+            src_dep=src_dep
+        ))
+        return edges_per_layer
 
     def __call__(self, src_buf, tgt_buf, device='cpu', src_deps=None, vocab=None):
         '''
@@ -202,9 +186,7 @@ class GraphPool:
         src_pos, tgt_pos = [], []
         enc_ids, dec_ids = [], []
         e2e_eids, d2d_eids, e2d_eids = [], [], []
-        layer_eids = {
-            'dep': [[], []]
-        }
+        layer_eids = []
         n_nodes, n_edges, n_tokens = 0, 0, 0
         for src_sample, tgt_sample, src_dep, n, m, n_ee, n_ed, n_dd in zip(src_buf, tgt_buf, src_deps, src_lens, tgt_lens, num_edges['ee'], num_edges['ed'], num_edges['dd']):
             src.append(th.tensor(src_sample, dtype=th.long, device=device))
@@ -223,16 +205,7 @@ class GraphPool:
             # We are using arange here. This will not work. Instead we need to select edges that
             # correspond to previous positions. This information is present in graph pool
             # For each edge, we need to figure out source_node_id and target_node_id.
-            if src_dep:
-                for i in range(0, 2):
-                    locals = list()
-                    for src_node_id, dst_node_id in dedupe_tuples(get_src_dst_deps(src_dep, i + 1)):
-                        locals.append(n_edges + src_node_id * n + dst_node_id)
-                        locals.append(n_edges + dst_node_id * n + src_node_id)
-                    max_layer_eid = max(locals)
-                    if max_layer_eid > (n_edges + n_ee):
-                        raise ValueError('Max layer eid {} exceeds {}'.format(max_layer_eid, n_edges + n_ee))
-                    layer_eids['dep'][i] += locals
+            layer_eids = self.get_edges_per_layer(2, src_dep, n_edges, n_ee, n)
 
             n_edges += n_ee
             e2d_eids.append(th.arange(n_edges, n_edges + n_ed, dtype=th.long, device=device))
