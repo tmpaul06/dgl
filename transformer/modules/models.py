@@ -83,18 +83,15 @@ class Transformer(nn.Module):
                             [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
                             [fn.sum('v', 'wv'), fn.sum('score', 'z')])
         else:
+            def pre_stack(nodes):
+                ret_dict = {}
+                for i in range(0, len(per_head)):
+                    ret_dict['v_{}'.format(i)] = nodes.data['v'][:, i, :]
+                    ret_dict['z_{}'.format(i)] = th.ones(nodes.data['v'].shape[0], 1)
+                return ret_dict
             # Initialize values
             g.apply_nodes(
-                # lambda nodes: {
-                #     'v_{}'.format(i): nodes.data['v'][:, i, :] for i in range(len(per_head))
-                # }
-                lambda nodes: {**{
-                    # Initialize v_i values for the nodes
-                    'v_{}'.format(i): nodes.data['v'][:, i, :] for i in range(len(per_head))
-                }, **{
-                    # Small value to prevent NaN
-                    'z_{}'.format(i): th.ones(nodes.data['v'].shape[0], 1) * 1e-10 for i in range(len(per_head))
-                }}
+                pre_stack
             )
             for head in range(0, len(per_head)):
                 score_key = 'score_{}'.format(head)
