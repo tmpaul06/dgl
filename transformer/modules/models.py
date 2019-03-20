@@ -250,7 +250,7 @@ class Transformer(nn.Module):
 
 
 def make_model(src_vocab, tgt_vocab, N=6,
-                   dim_model=512, dim_ff=2048, h=8, dropout=0.1, universal=False):
+                   dim_model=512, dim_ff=2048, h=2, dropout=0.1, universal=False):
     if universal:
         return make_universal_model(src_vocab, tgt_vocab, dim_model, dim_ff, h, dropout)
     c = copy.deepcopy

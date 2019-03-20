@@ -24,13 +24,13 @@ if __name__ == '__main__':
 
     dataset = get_dataset(args.dataset)
     V = dataset.vocab_size
-    dim_model = 512
+    dim_model = 128
 
     fpred = open('pred.txt', 'w')
     fref = open('ref.txt', 'w')
 
     graph_pool = GraphPool()
-    model = make_model(V, V, N=args.N, dim_model=dim_model)
+    model = make_model(V, V, N=args.N, dim_model=dim_model, h=2)
     with open('checkpoints/{}.pkl'.format(exp_setting), 'rb') as f:
         model.load_state_dict(th.load(f, map_location=lambda storage, loc: storage))
     model = model.to(device)
