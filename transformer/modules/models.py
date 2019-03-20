@@ -64,20 +64,6 @@ class Decoder(nn.Module):
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
 
-def n_stack(nodes):
-    per_head = [1, 2]
-    return {
-        'z': th.stack([nodes.data['z_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
-        'wv': th.stack([nodes.data['wv_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
-    }
-
-def v_stack(nodes):
-    return {
-        # Initialize v_0 values for the nodes
-        'v_0': nodes.data['v'][:, 0, :],
-        'v_1': nodes.data['v'][:, 1, :]
-    }
-
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, d_k):
         super(Transformer, self).__init__()
@@ -99,10 +85,16 @@ class Transformer(nn.Module):
         else:
             # Initialize values
             g.apply_nodes(
-                lambda nodes: {
+                # lambda nodes: {
+                #     'v_{}'.format(i): nodes.data['v'][:, i, :] for i in range(len(per_head))
+                # }
+                lambda nodes: {**{
                     # Initialize v_i values for the nodes
-                    'v_{}'.format(i): nodes.data['v'][:, 0, :] for i in range(len(per_head))
-                }
+                    'v_{}'.format(i): nodes.data['v'][:, i, :] for i in range(len(per_head))
+                }, **{
+                    # Small value to prevent NaN
+                    'z_{}'.format(i): th.ones(nodes.data['v'].shape[0], 1) * 1e-10 for i in range(len(per_head))
+                }}
             )
             for head in range(0, len(per_head)):
                 score_key = 'score_{}'.format(head)
@@ -117,11 +109,16 @@ class Transformer(nn.Module):
                                 [fn.sum(value_key, wv_key), fn.sum(score_key, z_key)])
 
             # After all heads are done we will now stack the z values
-            g.apply_nodes(
-                lambda nodes: {
+            def post_stack(nodes):
+                a = nodes.data['z_0']
+                b = nodes.data['v_0']
+                return {
                     'z': th.stack([nodes.data['z_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
                     'wv': th.stack([nodes.data['wv_{}'.format(i)] for i in range(0, len(per_head))], dim=1),
                 }
+
+            g.apply_nodes(
+                post_stack
             )
 
     def update_graph(self, g, eids, pre_pairs, post_pairs, per_head=None):
@@ -153,13 +150,6 @@ class Transformer(nn.Module):
         for i in range(self.encoder.N):
             pre_func = self.encoder.pre_func(i, 'qkv')
             post_func = self.encoder.post_func(i)
-            # Use the nodes and edges at this layer. For a given layer, the nodes are still the same
-            # but the edges are different
-            # if i == 0 and len(layer_eids['dep'][0]):
-            #     edges = layer_eids['dep'][0]
-            # elif i == 1 and len(layer_eids['dep'][1]):
-            #     edges = layer_eids['dep'][1]
-            # else:
             edges = eids['ee']
             nodes = nids['enc']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)], per_head=layer_eids[i])

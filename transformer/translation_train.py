@@ -149,7 +149,7 @@ if __name__ == '__main__':
             self.dataset = 'multi30k'
             self.devices = ['cuda:0']
             self.ngpu = 1
-            self.N = 3
+            self.N = 2
             self.use_deps = True
             self.batch = 64
             self.viz = True
