@@ -210,13 +210,9 @@ class Transformer(nn.Module):
             pre_func = self.encoder.pre_func(i, 'qkv')
             post_func = self.encoder.post_func(i)
             nodes = nids['enc']
-            if i == 0 and len(layer_eids['dep'][0]):
-                edges = layer_eids['dep'][0]
-            elif i == 1 and len(layer_eids['dep'][1]):
-                edges = layer_eids['dep'][1]
-            else:
-                edges = eids['ee']
-            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
+            edges = eids['ee']
+            self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)],
+                              per_head=layer_eids[i - 1] if i > 0 else [edges, edges])
 
         # decode
         log_prob = None
