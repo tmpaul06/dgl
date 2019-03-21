@@ -60,7 +60,7 @@ def main(dev_id, args):
     graph_pool = GraphPool()
     # Create model
     model = make_model(V, V, N=args.N, dim_model=dim_model,
-                       universal=args.universal, h=2, device=device)
+                       universal=args.universal, h=args.num_heads, device=device)
     # Sharing weights between Encoder & Decoder
     model.src_embed.lut.weight = model.tgt_embed.lut.weight
     model.generator.proj.weight = model.tgt_embed.lut.weight

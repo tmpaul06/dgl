@@ -51,7 +51,7 @@ if __name__ == '__main__':
     fref = open('ref.txt', 'w')
 
     graph_pool = GraphPool()
-    model = make_model(V, V, N=args.N, dim_model=dim_model, h=2, device=device)
+    model = make_model(V, V, N=args.N, dim_model=dim_model, h=args.num_heads, device=device)
     with open('checkpoints/{}.pkl'.format(exp_setting), 'rb') as f:
         model.load_state_dict(th.load(f, map_location=lambda storage, loc: storage))
     model = model.to(device)
