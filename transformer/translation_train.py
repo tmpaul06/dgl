@@ -112,9 +112,11 @@ def main(dev_id, args):
             if args.viz and epoch == (n_epoch - 1):
                 src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')
                 tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
-                draw_atts(model.att_weight_map, src_seq, tgt_seq, exp_setting, 'epoch_{}'.format(epoch))
+                draw_atts(model.att_weight_map, src_seq, tgt_seq, exp_setting, 'epoch_{}'.format(epoch), num_heads=args.num_heads)
             with open('checkpoints/{}-{}.pkl'.format(exp_setting, epoch), 'wb') as f:
                 torch.save(model.state_dict(), f)
+
+    return model
 
 if __name__ == '__main__':
     if not os.path.exists('checkpoints'):

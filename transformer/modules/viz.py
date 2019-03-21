@@ -39,12 +39,8 @@ def set_size(w,h, ax=None):
     figh = float(h)/(t-b)
     ax.figure.set_size_inches(figw, figh)
 
-def draw_heatmap(array, input_seq, output_seq, dirname, name):
-    dirname = os.path.join('log', dirname)
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
-
-    fig, axes = plt.subplots(1, 2)
+def draw_heatmap(array, input_seq, output_seq, dirname, name, num_heads):
+    fig, axes = plt.subplots(1, num_heads)
     cnt = 0
     for i in range(2):
         axes[i].imshow(array[cnt].transpose(-1, -2))
@@ -56,18 +52,19 @@ def draw_heatmap(array, input_seq, output_seq, dirname, name):
         plt.setp(axes[i].get_xticklabels(), rotation=45, ha="right",
                  rotation_mode="anchor")
         set_size(18, 18, axes[i])
+        cnt += 1
 
     fig.suptitle(name, fontsize=12)
 
-def draw_atts(maps, src, tgt, dirname, prefix):
+def draw_atts(maps, src, tgt, dirname, prefix, num_heads=2):
     '''
     maps[0]: encoder self-attention
     maps[1]: encoder-decoder attention
     maps[2]: decoder self-attention
     '''
-    draw_heatmap(maps[0], src, src, dirname, '{}_enc_self_attn'.format(prefix))
-    draw_heatmap(maps[1], src, tgt, dirname, '{}_enc_dec_attn'.format(prefix))
-    draw_heatmap(maps[2], tgt, tgt, dirname, '{}_dec_self_attn'.format(prefix))
+    draw_heatmap(maps[0], src, src, dirname, '{}_enc_self_attn'.format(prefix), num_heads)
+    draw_heatmap(maps[1], src, tgt, dirname, '{}_enc_dec_attn'.format(prefix). num_heads)
+    draw_heatmap(maps[2], tgt, tgt, dirname, '{}_dec_self_attn'.format(prefix), num_heads)
 
 mode2id = {'e2e': 0, 'e2d': 1, 'd2d': 2}
 
