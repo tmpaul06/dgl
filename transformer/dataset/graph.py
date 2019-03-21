@@ -109,7 +109,7 @@ class GraphPool:
                 # correspond to previous positions. This information is present in graph pool
                 # For each edge, we need to figure out source_node_id and target_node_id.
 
-                custom_edges = self.get_edges_per_layer(n_heads, src_dep, n_edges, n_ee, n)
+                custom_edges = self.get_edges_per_layer(n_heads, src_dep, n_edges, n_ee, n, device)
                 for ii, jj in itertools.product(range(n_layers), range(n_heads)):
                     layer_eids[ii][jj] += (custom_edges[ii][jj])
 
@@ -142,7 +142,7 @@ class GraphPool:
                      layer_eids=layer_eids,
                      n_tokens=n_tokens)
 
-    def get_edges_per_layer(self, num_layers, num_heads, src_dep, n_edges, n_ee, n):
+    def get_edges_per_layer(self, num_layers, num_heads, src_dep, n_edges, n_ee, n, device):
         """Return edges for each head in a given layer"""
         edges_per_layer = list()
 
@@ -165,7 +165,7 @@ class GraphPool:
             # Add None so that regular edges are used
             for i in range(2, num_layers):
                 edges_per_layer.append(
-                    [[None] for _ in range(num_heads)]
+                    [[th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device)] for _ in range(num_heads)]
                 )
 
         return edges_per_layer
@@ -229,7 +229,7 @@ class GraphPool:
             # We are using arange here. This will not work. Instead we need to select edges that
             # correspond to previous positions. This information is present in graph pool
             # For each edge, we need to figure out source_node_id and target_node_id.
-            custom_edges = self.get_edges_per_layer(n_layers, n_heads, src_dep, n_edges, n_ee, n)
+            custom_edges = self.get_edges_per_layer(n_layers, n_heads, src_dep, n_edges, n_ee, n, device)
             for ii, jj in itertools.product(range(n_layers), range(n_heads)):
                 layer_eids[ii][jj] += (custom_edges[ii][jj])
 

@@ -60,7 +60,7 @@ def main(dev_id, args):
     graph_pool = GraphPool()
     # Create model
     model = make_model(V, V, N=args.N, dim_model=dim_model,
-                       universal=args.universal, h=2)
+                       universal=args.universal, h=2, device=device)
     # Sharing weights between Encoder & Decoder
     model.src_embed.lut.weight = model.tgt_embed.lut.weight
     model.generator.proj.weight = model.tgt_embed.lut.weight
@@ -108,8 +108,8 @@ def main(dev_id, args):
             print("epoch time: {}".format(end - start))
 
             # Visualize attention
-            args_filter = ['batch', 'gpus', 'viz', 'master_ip', 'master_port', 'grad_accum', 'ngpu']
-            exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
+            exp_setting = args.get_exp_setting()
+            print(exp_setting)
             if args.viz and epoch == (n_epoch - 1):
                 src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')
                 tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
@@ -147,7 +147,7 @@ if __name__ == '__main__':
 
         def __init__(self):
             self.dataset = 'multi30k'
-            self.devices = ['cuda:0']
+            self.devices = ['cpu']
             self.ngpu = 1
             self.N = 2
             self.use_deps = True
@@ -159,6 +159,17 @@ if __name__ == '__main__':
             self.epoch = 20
             self.num_heads = 2
             self.gpus = '-1'
+
+        def get_exp_setting(self):
+            """Get a unique setting for the model params"""
+            args_filter = ['batch', 'gpus', 'viz', 'master_ip', 'master_port', 'grad_accum', 'ngpu']
+            sorted_keys = sorted(vars(args).keys())
+            exp_arr = list()
+            for k in sorted_keys:
+                if k not in args_filter:
+                    v = vars(args)[k]
+                    exp_arr.append('{}'.format(v if not isinstance(v, list) else '.'.join(v)))
+            return '-'.join(exp_arr)
 
     args = TransformerArgs()
 

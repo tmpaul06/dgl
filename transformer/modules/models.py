@@ -65,7 +65,7 @@ class Decoder(nn.Module):
         return func
 
 class Transformer(nn.Module):
-    def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, d_k):
+    def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, d_k, device):
         super(Transformer, self).__init__()
         self.encoder,  self.decoder = encoder, decoder
         self.src_embed, self.tgt_embed = src_embed, tgt_embed
@@ -73,6 +73,7 @@ class Transformer(nn.Module):
         self.generator = generator
         self.h, self.d_k = h, d_k
         self.att_weight_map = None
+        self.device = device
 
     def propagate_attention(self, g, eids, per_head):
         if not per_head or (per_head and all([all([a is None for a in p_h]) for p_h in per_head])):
@@ -87,7 +88,7 @@ class Transformer(nn.Module):
                 ret_dict = {}
                 for i in range(0, len(per_head)):
                     ret_dict['v_{}'.format(i)] = nodes.data['v'][:, i, :]
-                    ret_dict['z_{}'.format(i)] = th.ones(nodes.data['v'].shape[0], 1, dtype=th.float32, device=th.device('cuda:0'))
+                    ret_dict['z_{}'.format(i)] = th.ones(nodes.data['v'].shape[0], 1, dtype=th.float32, device=self.device)
                 return ret_dict
             # Initialize values
             g.apply_nodes(
@@ -270,7 +271,7 @@ class Transformer(nn.Module):
 
 
 def make_model(src_vocab, tgt_vocab, N=6,
-                   dim_model=512, dim_ff=2048, h=8, dropout=0.1, universal=False):
+                   dim_model=512, dim_ff=2048, h=8, dropout=0.1, universal=False, device=th.device('cpu')):
     if universal:
         return make_universal_model(src_vocab, tgt_vocab, dim_model, dim_ff, h, dropout)
     c = copy.deepcopy
@@ -284,7 +285,7 @@ def make_model(src_vocab, tgt_vocab, N=6,
     tgt_embed = Embeddings(tgt_vocab, dim_model)
     generator = Generator(dim_model, tgt_vocab)
     model = Transformer(
-        encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, dim_model // h)
+        encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, dim_model // h, device)
     # xavier init
     for p in model.parameters():
         if p.dim() > 1:
