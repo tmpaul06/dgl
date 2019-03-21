@@ -109,7 +109,7 @@ class GraphPool:
                 # correspond to previous positions. This information is present in graph pool
                 # For each edge, we need to figure out source_node_id and target_node_id.
 
-                custom_edges = self.get_edges_per_layer(n_heads, src_dep, n_edges, n_ee, n, device)
+                custom_edges = self.get_edges_per_layer(n_layers, n_heads, src_dep, n_edges, n_ee, n, device)
                 for ii, jj in itertools.product(range(n_layers), range(n_heads)):
                     layer_eids[ii][jj] += (custom_edges[ii][jj])
 
