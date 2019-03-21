@@ -63,7 +63,7 @@ def draw_atts(maps, src, tgt, dirname, prefix, num_heads=2):
     maps[2]: decoder self-attention
     '''
     draw_heatmap(maps[0], src, src, dirname, '{}_enc_self_attn'.format(prefix), num_heads)
-    draw_heatmap(maps[1], src, tgt, dirname, '{}_enc_dec_attn'.format(prefix). num_heads)
+    draw_heatmap(maps[1], src, tgt, dirname, '{}_enc_dec_attn'.format(prefix), num_heads)
     draw_heatmap(maps[2], tgt, tgt, dirname, '{}_dec_self_attn'.format(prefix), num_heads)
 
 mode2id = {'e2e': 0, 'e2d': 1, 'd2d': 2}
