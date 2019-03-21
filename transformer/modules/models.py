@@ -264,7 +264,7 @@ class Transformer(nn.Module):
 
     def _register_att_map(self, g, enc_ids, dec_ids):
         self.att_weight_map = [
-            get_attention_map(g, enc_ids, enc_ids, self.h),
+            get_attention_map(g, enc_ids, enc_ids, self.h, True),
             get_attention_map(g, enc_ids, dec_ids, self.h),
             get_attention_map(g, dec_ids, dec_ids, self.h),
         ]

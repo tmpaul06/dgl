@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from networkx.algorithms import bipartite
 
-def get_attention_map(g, src_nodes, dst_nodes, h):
+def get_attention_map(g, src_nodes, dst_nodes, h, per_head=False):
     """
     To visualize the attention score between two set of nodes.
     """
@@ -18,7 +18,11 @@ def get_attention_map(g, src_nodes, dst_nodes, h):
             if not g.has_edge_between(src, dst):
                 continue
             eid = g.edge_id(src, dst)
-            weight[i][j] = g.edata['score'][eid].squeeze(-1).cpu().detach()
+            if per_head:
+                for hh in range(0, h):
+                    weight[i][j][hh] = g.edata['score_{}'.format(hh)][eid].squeeze(-1).cpu().detach()
+            else:
+                weight[i][j] = g.edata['score'][eid].squeeze(-1).cpu().detach()
 
     weight = weight.transpose(0, 2)
     att = th.softmax(weight, -2)

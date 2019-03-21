@@ -165,7 +165,7 @@ class GraphPool:
             # Add None so that regular edges are used
             for i in range(2, num_layers):
                 edges_per_layer.append(
-                    [[th.arange(n_edges, n_edges + n_ee, dtype=th.long, device=device)] for _ in range(num_heads)]
+                    [list(range(n_edges, n_edges + n_ee)) for _ in range(num_heads)]
                 )
 
         return edges_per_layer

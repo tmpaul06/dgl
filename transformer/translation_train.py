@@ -109,7 +109,6 @@ def main(dev_id, args):
 
             # Visualize attention
             exp_setting = args.get_exp_setting()
-            print(exp_setting)
             if args.viz and epoch == (n_epoch - 1):
                 src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')
                 tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
@@ -149,14 +148,14 @@ if __name__ == '__main__':
             self.dataset = 'multi30k'
             self.devices = ['cpu']
             self.ngpu = 1
-            self.N = 2
+            self.N = 3
             self.use_deps = True
             self.batch = 64
             self.viz = True
             self.universal = False
             self.print = False
             self.grad_accum = 1
-            self.epoch = 20
+            self.epoch = 2
             self.num_heads = 2
             self.gpus = '-1'
 
